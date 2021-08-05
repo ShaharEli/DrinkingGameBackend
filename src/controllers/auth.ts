@@ -1,9 +1,9 @@
-import bcrypt from "bcryptjs";
-import { Request, Response } from "express";
-import Error from "../db/schemas/error";
-import User from "../db/schemas/user";
-import Logger from "../logger/logger";
-import { IUser, IUserKeys } from "../types";
+import bcrypt from 'bcryptjs';
+import { Request, Response } from 'express';
+import Error from '../db/schemas/error';
+import User from '../db/schemas/user';
+import Logger from '../logger/logger';
+import { IUser, IUserKeys } from '../types';
 import {
   friendsFields,
   generateUserName,
@@ -11,11 +11,13 @@ import {
   verifyRefreshToken,
   generateAccessToken,
   generateRefreshToken,
-} from "../utils";
-import { userValidationSchema } from "../validations/user";
+} from '../utils';
+import { userValidationSchema } from '../validations/user';
 
 export const logErrorToService = async (req: Request, res: Response) => {
-  const { info, platform, user, error } = req.body;
+  const {
+    info, platform, user, error,
+  } = req.body;
   const payload = {
     info: JSON.stringify(error),
     platform,
@@ -23,7 +25,7 @@ export const logErrorToService = async (req: Request, res: Response) => {
     error: JSON.stringify(error),
   };
   if (!user) delete payload.user;
-  if (!user && !info && !error) createError("not enough data provided", 400);
+  if (!user && !info && !error) createError('not enough data provided', 400);
   // TODO validation
   const newError = new Error(payload);
   const savedError = await newError.save();
@@ -32,38 +34,38 @@ export const logErrorToService = async (req: Request, res: Response) => {
 
 export const login = async (req: Request, res: Response) => {
   const { password, email } = req.body;
-  if (!password || !email) createError("content missing", 400);
+  if (!password || !email) createError('content missing', 400);
   const user = await User.findOne({ email }).populate({
-    path: "friends",
+    path: 'friends',
     select: friendsFields,
   });
-  if (!user) return createError("error occurred", 500);
+  if (!user) return createError('error occurred', 500);
   const isPassOk = bcrypt.compareSync(password, user.password!);
-  if (!isPassOk) createError("One of the fields incorrect", 500); //TODO better response
+  if (!isPassOk) createError('One of the fields incorrect', 500); // TODO better response
   delete user?.password;
   const accessToken = generateAccessToken(user._id, user.userName, user.role);
   const refreshToken = await generateRefreshToken(
     user._id,
     user.userName,
-    user.role
+    user.role,
   );
   res.json({ accessToken, refreshToken, user });
 };
 
 export const loginWithToken = async (req: Request, res: Response) => {
   const { refreshToken } = req.body;
-  if (!refreshToken) createError("token missing", 400);
+  if (!refreshToken) createError('token missing', 400);
   const data = verifyRefreshToken(refreshToken);
-  if (!data) return createError("token missing", 400);
+  if (!data) return createError('token missing', 400);
   const { userId } = data;
-  if (!userId) createError("invalid token", 400);
+  if (!userId) createError('invalid token', 400);
   const user = await User.findById(userId)
     .populate({
-      path: "friends",
+      path: 'friends',
       select: friendsFields,
     })
     .lean();
-  if (!user) return createError("error occurred", 500);
+  if (!user) return createError('error occurred', 500);
   delete user.password;
   const accessToken = generateAccessToken(userId, user.userName, user.role);
   res.json({ user, accessToken });
@@ -84,22 +86,22 @@ export const editUser = async (req: Request, res: Response) => {
     avatar,
     userName,
   };
-  for (let key in payload) {
+  Object.keys(payload).forEach((key) => {
     if (payload[key as IUserKeys] === null) {
       delete payload[key as IUserKeys];
     }
-  }
+  });
 
-  if (!Object.keys(payload).length) createError("data missing", 400);
+  if (!Object.keys(payload).length) createError('data missing', 400);
   const user = await User.findByIdAndUpdate(req.userId, payload, {
     new: true,
   })
     .populate({
-      path: "friends",
+      path: 'friends',
       select: friendsFields,
     })
     .lean();
-  if (!user) return createError("error occurred", 400);
+  if (!user) return createError('error occurred', 400);
   delete user.password;
   res.json({ user });
 };
@@ -127,7 +129,7 @@ export const register = async (req: Request, res: Response) => {
   try {
     await userValidationSchema.validateAsync(payload);
     const isUserExists = await User.findOne({ email, isVerified: true });
-    if (isUserExists) createError("error occurred", 400);
+    if (isUserExists) createError('error occurred', 400);
     const passwordHash = bcrypt.hashSync(payload.password!, 8);
     payload.password = passwordHash;
     payload.userName = await generateUserName({ firstName, lastName });
@@ -136,19 +138,19 @@ export const register = async (req: Request, res: Response) => {
     const accessToken = generateAccessToken(
       user._id,
       newUser.userName,
-      newUser.role
+      newUser.role,
     );
     const refreshToken = await generateRefreshToken(
       user._id,
       newUser.userName,
-      newUser.role
+      newUser.role,
     );
     delete user.password;
     // TODO send mail
     res.json({ user, accessToken, refreshToken });
   } catch (err) {
     Logger.error(err);
-    createError("error occurred", 400);
+    createError('error occurred', 400);
   }
 };
 
@@ -162,9 +164,9 @@ export const checkIfUserNameIsValid = async (req: Request, res: Response) => {
 
 export const getToken = async (req: Request, res: Response) => {
   const { refreshToken } = req.body;
-  if (!refreshToken) createError("token missing", 400);
+  if (!refreshToken) createError('token missing', 400);
   const data = verifyRefreshToken(refreshToken);
-  if (!data) return createError("token invalid", 400);
+  if (!data) return createError('token invalid', 400);
   const { userId, userName, role } = data;
   const accessToken = generateAccessToken(userId, userName, role);
   res.json({ accessToken });
